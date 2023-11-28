@@ -4,6 +4,7 @@ const puppeteer = require('puppeteer')
 const fs = require('fs');
 const path = require('path')
 const printPdf = require('pdf-to-printer').print
+const getPrinters = require('pdf-to-printer').getPrinters
 const request = require('request')
 const moment = require('moment')
 require('dotenv').config()
@@ -25,46 +26,6 @@ let list = [
     573546,
     573547,
     573548,
-    // 573552,
-    // 573553,
-    // 573554,
-    // 573555,
-    // 573556,
-    // 573559,
-    // 573564,
-    // 573566,
-    // 573567,
-    // 573568,
-    // 573569,
-    // 573570,
-    // 573571,
-    // 573572,
-    // 573575,
-    // 573576,
-    // 573578,
-    // 573581,
-    // 573582,
-    // 573584,
-    // 573588,
-    // 573589,
-    // 573593,
-    // 573594,
-    // 573598,
-    // 573599,
-    // 573600,
-    // 573601,
-    // 573604,
-    // 573607,
-    // 573608,
-    // 573612,
-    // 573613,
-    // 573614,
-    // 573616,
-    // 573617,
-    // 573619,
-    // 573621,
-    // 573622,
-    // 573625,
 ];	
 
 //funcion para levantar la pagina y quedar en espera 
@@ -158,6 +119,7 @@ const print = async(nroOt)=>{
     }
 }
 
+
 //endpoint para la impresion de la ot 
 app.get('/print/:ot', async (req, res )=>{
     try {
@@ -181,6 +143,13 @@ app.get('/print/:ot', async (req, res )=>{
         res.status(500).send('ocurrio un error')
         console.log('ocurrio un error en el endpoint print ot ', error )        
     }
+})
+
+app.get('/printers', (req, res )=>{
+    getPrinters().then(e=> {
+        console.log('lista de impresoras ', e)
+        res.send(e)
+    })
 })
 
 // para test... 
@@ -210,6 +179,7 @@ app.get('/test', async(req, res)=>{
 
 
 app.get('/', async (req , res )=>{ 
+    
     res.send('servidor impresion ot')
 })
 
