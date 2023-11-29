@@ -4,12 +4,15 @@ const puppeteer = require('puppeteer')
 const fs = require('fs');
 const path = require('path')
 const printPdf = require('pdf-to-printer').print
+const printPdf2 = require('pdf-to-printer').print
 const getPrinters = require('pdf-to-printer').getPrinters
 const request = require('request')
 const moment = require('moment')
 require('dotenv').config()
 const knex = require('./db/config.js')
 const sql = require('./db/query.js')
+var cors = require('cors')
+app.use(cors())
 
 let page;
 let fileExist=0
@@ -43,7 +46,7 @@ const upPage = async()=>{
 upPage() 
 
 //funcion que realiza la opracion de editar la pagina 
-const getPage = async (nroOt =  561604 )=>{
+const getPage = async (nroOt =  561604, printerType )=>{
     try {
         stop = nroOt // para manejar cola... 
         const rows = await sql.queryServicio(nroOt) //consultamos datos de la ot 
@@ -74,7 +77,7 @@ const getPage = async (nroOt =  561604 )=>{
         ])
         .then(async() => {
             setTimeout(async()=>{
-                await printPage(nroOt)//preparamos la pagina para crear el pdf y luego imprimir
+                await printPage(nroOt, printerType)//preparamos la pagina para crear el pdf y luego imprimir
                 console.log(nroOt, 'impresion lista ', moment().format('YYYY-MM-DD hh:mm:ss.mmm'))
                 setTimeout(()=>stop = 0 , 500) //
             }, 500)
@@ -88,29 +91,48 @@ const getPage = async (nroOt =  561604 )=>{
  * Funcion 
  * @param {number} nroOt - pasamos el nro de ot que queremos imprimir 
  */
-const printPage = async (nroOt) => {
+const printPage = async (nroOt, printerType) => {
     try {
         await page.emulateMediaType('print')
-        await page.pdf({ path: `public/${nroOt}.pdf`, format: 'Legal', scale: 0.98 }) //creamos la impresion a pdf 
+        await page.pdf({ path: `public/${nroOt}_${printerType}.pdf`, format: 'Legal', scale: 0.98 }) //creamos la impresion a pdf 
         console.log(nroOt, 'imprimir ot ', moment().format('YYYY-MM-DD hh:mm:ss'))
     } catch (error) { /*si hay error en la creacion del pdf */ }
 }
 
 //funcion para imprimir en la impresora destinada 
-const print = async(nroOt)=>{
+const print = async(nroOt, printerType)=>{
     try {
         await (function(){
             return new Promise((resolve, reject)=>{
                 setTimeout(async()=>{
                     const options = {
-                        printer: "Samsung M4370 5370 Series (192.168.70.21)",
+                        printer: "Samsung M408x Series (192.168.110.14)",
                         paperSize: 'Folio'
                     };
-                    printPdf( `public/${nroOt}.pdf` , options).then((e)=> {
-                        console.log(`impresion enviada ${nroOt} `, moment().format('YYYY-MM-DD hh:mm:ss'))
-                        fs.unlinkSync( path.join(__dirname, `/public/${nroOt}.pdf`)) //eliminamos el pdf creado 
-                    })
-                    resolve('impresion lista')
+                    const options2 = {
+                        printer: "Brother DCP-L5650DN series Printer",
+                        paperSize: 'Legal'
+                    };
+					console.log('que envia ....' , printerType , typeof printerType)
+					if(printerType === '1'){//printer asesores 
+						//impresion en sala asesores 
+						printPdf( `public/${nroOt}_${printerType}.pdf` , options).then((e)=> {
+							console.log(`impresion enviada 1 ${nroOt} `, moment().format('YYYY-MM-DD hh:mm:ss'))
+							fs.unlinkSync( path.join(__dirname, `/public/${nroOt}_${printerType}.pdf`)) //eliminamos el pdf creado 
+							resolve('impresion lista 1')
+							
+						})
+						
+					}else{//printer taller
+						//impresion en coordinacion taller 
+						printPdf2( `public/${nroOt}_${printerType}.pdf` , options2).then((e)=> {
+							console.log(`impresion enviada 2 ${nroOt} `, moment().format('YYYY-MM-DD hh:mm:ss'))
+							fs.unlinkSync( path.join(__dirname, `/public/${nroOt}_${printerType}.pdf`)) //eliminamos el pdf creado 
+							resolve('impresion lista 2')
+							
+						})
+					}
+                    //resolve('impresion lista')
                 }, 500) //delay para liberar buffer 
             })
         })()
@@ -119,23 +141,27 @@ const print = async(nroOt)=>{
     }
 }
 
-
 //endpoint para la impresion de la ot 
-app.get('/print/:ot', async (req, res )=>{
+app.get('/print/:ot/:printer', async (req, res )=>{
     try {
+		//printer 1 solo asesores 
+		//printer 2 asesores y taller 
         const nroOt = req.params.ot
+        const printer = req.params.printer
         let wait = setInterval(async()=>{
             if(stop === 0){
-                getPage(nroOt)
+                getPage(nroOt, printer)
                 clearInterval(wait)
             }
          }, 800)
 
         let findFile = setInterval(async() =>{
             //si ya existe el archivo en fisico correr el proceso 
-            if (fs.existsSync( path.join(__dirname, `/public/${nroOt}.pdf`) )) {
-                print(nroOt) //funcion principal que envia la impresion ... 
-                res.send('impresion lista ' + moment().format('YYYY-MM-DD hh:mm:ss'))
+            if (fs.existsSync( path.join(__dirname, `/public/${nroOt}_${printer}.pdf`) )) {
+				console.log('que vamos a imprimir ', printer)
+                print(nroOt, printer) //funcion principal que envia la impresion ... 
+                //res.send('impresion lista ' + moment().format('YYYY-MM-DD hh:mm:ss'))
+                res.status(200).json({msg: `impresion ${(printer===1)?'asesores':'taller'} lista ` + moment().format('YYYY-MM-DD hh:mm:ss')})
                 clearInterval(findFile)//paramos el buscador... 
             }
         }, 500)
