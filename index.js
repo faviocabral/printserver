@@ -39,7 +39,7 @@ const upPage = async()=>{
     })
     page = await browser.newPage()
     await page.goto( `http://192.168.10.170:8089/impresion999.php` , { waitUntil: 'domcontentloaded' } )//levantamos la pagina de impresion
-    console.log('pagina lista ', moment().format('YYYY-MM-DD hh:mm:ss'))
+    console.log('pagina lista ', moment().format('YYYY-MM-DD HH:mm:ss'))
 }
 
 //se ejecuta cada vez que se inicia el proceso luego queda en espera la pagina de impresion
@@ -53,11 +53,11 @@ const getPage = async (nroOt =  561604, printerType )=>{
         const rowsMora = await sql.queryMora(nroOt) //consultamos datos de mora 
         const rowsCampaña = await sql.queryCampaña(nroOt) //consultamos datos de campaña
         const rowsPlanPlus = await sql.queryPlanPlus(nroOt) //consultamos datos promocion 
-        console.log(nroOt, 'consulta lista ', moment().format('YYYY-MM-DD hh:mm:ss.mmm'))
+        console.log(nroOt, 'consulta lista ', moment().format('YYYY-MM-DD HH:mm:ss.mmm'))
         if(rowsMora.length > 0 ){//si existe datos de mora mostramos en pantalla 
-            await page.$eval( `#mora`, (el, val) => el.innerText = val, `Cliente con ${rowsMora[0].mora} dias Mora`)
+            await page.$eval( `#mora`, (el, val) => el.innerHTML = val, `<span class="glyphicon glyphicon-exclamation-sign"></span> Cliente con ${rowsMora[0].mora} dias Mora`)
         }else{
-            await page.$eval( `#mora`, (el, val) => el.innerText = val, 'Cliente al Dia!')
+            await page.$eval( `#mora`, (el, val) => el.innerHTML = val, '<span class="glyphicon glyphicon-ok"></span> Cliente al Dia!')
         } 
         if(rowsCampaña.length > 0 ){
             await page.$eval( `#campanha`, (el, val) => el.innerText = val, rowsCampaña[0].texto) //si existe campaña mostramos el mensaje
@@ -72,13 +72,16 @@ const getPage = async (nroOt =  561604, printerType )=>{
         const parametros =  Object.entries(rows[0])//obtenemos los campos y datos para insertar en la pagina e crear el pdf y luego imprimir 
         await Promise.all([ //esperamos que se complete todos los campos de 
             parametros.forEach(async(item) =>{ 
-                await page.$eval( `#${item[0]}`, (el, val) => el.innerText = val, (item[0].includes('Fecha') ? String(item[1]).slice(0,10) : item[1] ) )
+                await page.$eval( `#${item[0]}`, (el, val) => el.innerText = val, (item[0].includes('Fecha') ? moment(item[1]).format('YYYY-MM-DD') : item[1] ) )
             })
         ])
+        .then(async(e)=>{
+            await page.$eval( `#hora-impresion`, (el, val) => el.innerText = val, moment().format('YYYY-MM-DD HH:mm:ss') )
+        })
         .then(async() => {
             setTimeout(async()=>{
                 await printPage(nroOt, printerType)//preparamos la pagina para crear el pdf y luego imprimir
-                console.log(nroOt, 'impresion lista ', moment().format('YYYY-MM-DD hh:mm:ss.mmm'))
+                console.log(nroOt, 'impresion lista ', moment().format('YYYY-MM-DD HH:mm:ss.mmm'))
                 setTimeout(()=>stop = 0 , 500) //
             }, 500)
         })
@@ -95,7 +98,7 @@ const printPage = async (nroOt, printerType) => {
     try {
         await page.emulateMediaType('print')
         await page.pdf({ path: `public/${nroOt}_${printerType}.pdf`, format: 'Legal', scale: 0.98 }) //creamos la impresion a pdf 
-        console.log(nroOt, 'imprimir ot ', moment().format('YYYY-MM-DD hh:mm:ss'))
+        console.log(nroOt, 'imprimir ot ', moment().format('YYYY-MM-DD HH:mm:ss'))
     } catch (error) { /*si hay error en la creacion del pdf */ }
 }
 
@@ -117,7 +120,7 @@ const print = async(nroOt, printerType)=>{
 					if(printerType === '1'){//printer asesores 
 						//impresion en sala asesores 
 						printPdf( `public/${nroOt}_${printerType}.pdf` , options).then((e)=> {
-							console.log(`impresion enviada 1 ${nroOt} `, moment().format('YYYY-MM-DD hh:mm:ss'))
+							console.log(`impresion enviada 1 ${nroOt} `, moment().format('YYYY-MM-DD HH:mm:ss'))
 							fs.unlinkSync( path.join(__dirname, `/public/${nroOt}_${printerType}.pdf`)) //eliminamos el pdf creado 
 							resolve('impresion lista 1')
 							
@@ -126,7 +129,7 @@ const print = async(nroOt, printerType)=>{
 					}else{//printer taller
 						//impresion en coordinacion taller 
 						printPdf2( `public/${nroOt}_${printerType}.pdf` , options2).then((e)=> {
-							console.log(`impresion enviada 2 ${nroOt} `, moment().format('YYYY-MM-DD hh:mm:ss'))
+							console.log(`impresion enviada 2 ${nroOt} `, moment().format('YYYY-MM-DD HH:mm:ss'))
 							fs.unlinkSync( path.join(__dirname, `/public/${nroOt}_${printerType}.pdf`)) //eliminamos el pdf creado 
 							resolve('impresion lista 2')
 							
@@ -160,8 +163,8 @@ app.get('/print/:ot/:printer', async (req, res )=>{
             if (fs.existsSync( path.join(__dirname, `/public/${nroOt}_${printer}.pdf`) )) {
 				console.log('que vamos a imprimir ', printer)
                 print(nroOt, printer) //funcion principal que envia la impresion ... 
-                //res.send('impresion lista ' + moment().format('YYYY-MM-DD hh:mm:ss'))
-                res.status(200).json({msg: `impresion ${(printer===1)?'asesores':'taller'} lista ` + moment().format('YYYY-MM-DD hh:mm:ss')})
+                //res.send('impresion lista ' + moment().format('YYYY-MM-DD HH:mm:ss'))
+                res.status(200).json({msg: `impresion ${(printer===1)?'asesores':'taller'} lista ` + moment().format('YYYY-MM-DD HH:mm:ss')})
                 clearInterval(findFile)//paramos el buscador... 
             }
         }, 500)
@@ -194,13 +197,13 @@ app.get('/test', async(req, res)=>{
         list.forEach( (item, x)=>{
             setTimeout(async()=>{
                 request(`http://localhost:3200/print/${item}`, function (error, response, body) {
-                    //console.log('test listo' , moment().format('YYYY-MM-DD hh:mm:ss'))
-                    pruebas.push({ id: pruebas.length +1 , ot:item, time: moment().format('YYYY-MM-DD hh:mm:ss') })
+                    //console.log('test listo' , moment().format('YYYY-MM-DD HH:mm:ss'))
+                    pruebas.push({ id: pruebas.length +1 , ot:item, time: moment().format('YYYY-MM-DD HH:mm:ss') })
                     //console.log('lista ', pruebas)
                 })
             }, x * 500)
         })
-        res.send('enviado' + moment().format('YYYY-MM-DD hh:mm:ss'))
+        res.send('enviado' + moment().format('YYYY-MM-DD HH:mm:ss'))
 })
 
 
